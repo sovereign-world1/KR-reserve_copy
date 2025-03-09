@@ -1,0 +1,8 @@
+{
+    "python.defaultInterpreterPath": "C:\\Program Files\\Python313\\python.exe",
+    "python.languageServer": "Pylance",
+    "python.pythonPath": "C:\\Program Files\\Python313\\python.exe",
+    "python.formatting.provider": "black",
+    "editor.formatOnSave": true,
+    "python.linting.pylintEnabled": true
+}
