@@ -50,29 +50,24 @@ class YD:
         }
         self.base = 'https://cloud-api.yandex.net/v1/disk/resources/'  # Базовый URL для запросов к API Яндекс.Диска
 
-    def create_folder(self, folder_name):
-        # Создание папки на Яндекс.Диске
-        url = f'{self.base}?path={folder_name}'  # URL для создания папки
-        response = requests.put(url, headers=self.headers)  # Выполнение PUT-запроса
-        if response.status_code == 201:
-            print(f"Папка {folder_name} успешно создана.")
-            return True
-        elif response.status_code == 409:
+    def ensure_folder_exists(self, folder_name):
+        # Создание папки на Яндекс.Диске, если она не существует
+        url = f'{self.base}?path={folder_name}'  # URL для проверки существования папки
+        response = requests.get(url, headers=self.headers)  # Выполнение GET-запроса
+        if response.status_code == 200:
             print(f"Папка {folder_name} уже существует.")
             return True
+        elif response.status_code == 404:
+            # Папка не существует, создаем её
+            create_response = requests.put(url, headers=self.headers)  # Выполнение PUT-запроса для создания папки
+            if create_response.status_code == 201:
+                print(f"Папка {folder_name} успешно создана.")
+                return True
+            else:
+                print(f"Ошибка при создании папки {folder_name}: {create_response.status_code} - {create_response.text}")
+                return False
         else:
-            print(f"Ошибка при создании папки {folder_name}: {response.status_code} - {response.text}")
-            return False
-
-    def check_folder_exists(self, folder_name):
-        # Проверка существования папки на Яндекс.Диске
-        url = f'{self.base}?path={folder_name}'
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            print(f"Папка {folder_name} существует.")
-            return True
-        else:
-            print(f"Папка {folder_name} не существует: {response.status_code} - {response.text}")
+            print(f"Ошибка при проверке существования папки {folder_name}: {response.status_code} - {response.text}")
             return False
 
     def upload_file(self, file_content, file_name, folder_name):
@@ -103,19 +98,6 @@ class YD:
             print(f"Ошибка при загрузке файла {file_name} на Яндекс.Диск: {e}")
             return False
 
-class GD:
-    def __init__(self, token):
-        # Инициализация параметров для запросов к API Google Drive (заглушка)
-        print('Создался GD')
-
-    def create_folder(self, folder_name):
-        # Создание папки на Google Drive (заглушка)
-        pass
-
-    def upload_file(self, path, file_name):
-        # Загрузка файла на Google Drive (заглушка)
-        pass
-
 def save_photo_info_to_json(photo_info_list, filename='photo_info.json'):
     # Сохранение информации о фотографиях в JSON-файл
     with open(filename, 'w') as f:
@@ -126,7 +108,7 @@ def main():
     config = configparser.ConfigParser()  # Создание объекта для работы с конфигурационным файлом
     config.read('settings.ini')  # Чтение конфигурационного файла
     vk_token = config['Tokens']['vk_token']  # Получение токена ВКонтакте из конфигурационного файла
-    yd_token = config['Tokens']['yandex_token']  # Получение токена Яндекс.Диска из конфигурационного файла
+    yd_token = config['Tokens']['yd_token']  # Получение токена Яндекс.Диска из конфигурационного файла
 
     vk = VK(vk_token)  # Инициализация объекта класса VK
     yd = YD(yd_token)  # Инициализация объекта класса YD
@@ -138,12 +120,8 @@ def main():
     sorted_photos = vk.sort_photos_by_likes_and_size(photos)  # Сортировка фотографий
 
     folder_name = f"backup_{vk_user_id}"  # Создание имени папки для резервного копирования
-    if not yd.create_folder(folder_name):  # Создание папки на Яндекс.Диске
+    if not yd.ensure_folder_exists(folder_name):  # Создание папки на Яндекс.Диске, если она не существует
         print("Не удалось создать папку на Яндекс.Диске. Завершение программы.")
-        return
-
-    if not yd.check_folder_exists(folder_name):  # Проверка существования папки
-        print("Папка на Яндекс.Диске не существует. Завершение программы.")
         return
 
     photo_info_list = []  # Список для хранения информации о фотографиях
@@ -172,11 +150,11 @@ def main():
             # Загрузка фотографии в переменную
             response = requests.get(photo_url)
             if response.status_code != 200:
-                print(f"Ошибка при загрузке файла {file_name} на локальный диск: {response.status_code} - {response.text}")
+                print(f"Ошибка при загрузке файла {file_name} с ВКонтакте: {response.status_code} - {response.text}")
                 continue
             file_content = response.content  # Содержимое файла
         except Exception as e:
-            print(f"Ошибка при загрузке файла {file_name} на локальный диск: {e}")
+            print(f"Ошибка при загрузке файла {file_name} с ВКонтакте: {e}")
             continue
         
         yd.upload_file(file_content, file_name, folder_name)  # Загрузка фотографии на Яндекс.Диск
